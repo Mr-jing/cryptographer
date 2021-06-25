@@ -26,12 +26,14 @@ type Crypto struct {
 
 func (c *Crypto) Encrypt(plainText []byte) (string, error) {
 	// 密文
-	cipherText := make([]byte, aes.BlockSize+c.macSize+len(plainText))
+	cipherByte := make([]byte, aes.BlockSize+c.macSize+len(plainText))
 
 	// iv 长度等于 aes.BlockSize
-	iv := cipherText[0:aes.BlockSize]
+	iv := cipherByte[0:aes.BlockSize]
 
-	mac := cipherText[aes.BlockSize : aes.BlockSize+c.macSize]
+	mac := cipherByte[aes.BlockSize : aes.BlockSize+c.macSize]
+
+	cipherText := cipherByte[aes.BlockSize+c.macSize:]
 
 	// 随机填充 iv
 	if _, err := rand.Read(iv); err != nil {
@@ -40,18 +42,22 @@ func (c *Crypto) Encrypt(plainText []byte) (string, error) {
 
 	// 生成密文
 	stream := cipher.NewCFBEncrypter(c.block, iv)
-	stream.XORKeyStream(cipherText[aes.BlockSize+c.macSize:], plainText)
+	stream.XORKeyStream(cipherText, plainText)
 
 	// 生成并填充 mac
-	copy(mac, c.generateMAC(iv, cipherText))
+	s := c.generateMAC(iv, cipherText)
+	copy(mac, s)
 
 	// 返回 base64 字符串
-	return base64.StdEncoding.EncodeToString(cipherText), nil
+	return base64.StdEncoding.EncodeToString(cipherByte), nil
 }
 
 func (c *Crypto) generateMAC(iv []byte, cipherText []byte) []byte {
+	var p []byte
 	h := hmac.New(c.macHash, []byte(c.key))
-	h.Write(append(iv, cipherText...))
+	p = append(p, iv...)
+	p = append(p, cipherText...)
+	h.Write(p)
 	return h.Sum(nil)
 }
 
