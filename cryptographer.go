@@ -17,14 +17,14 @@ type Cryptographer interface {
 	Decrypt(cipherText string) (string, error)
 }
 
-type crypto struct {
+type Crypto struct {
 	key     string
 	macHash func() hash.Hash
 	macSize int
 	block   cipher.Block
 }
 
-func (c *crypto) Encrypt(plainText []byte) (string, error) {
+func (c *Crypto) Encrypt(plainText []byte) (string, error) {
 	// 密文
 	cipherText := make([]byte, aes.BlockSize+c.macSize+len(plainText))
 
@@ -49,18 +49,18 @@ func (c *crypto) Encrypt(plainText []byte) (string, error) {
 	return base64.StdEncoding.EncodeToString(cipherText), nil
 }
 
-func (c *crypto) generateMAC(iv []byte, cipherText []byte) []byte {
+func (c *Crypto) generateMAC(iv []byte, cipherText []byte) []byte {
 	h := hmac.New(c.macHash, []byte(c.key))
 	h.Write(append(iv, cipherText...))
 	return h.Sum(nil)
 }
 
-func (c *crypto) validMac(iv, cipherText, mac []byte) bool {
+func (c *Crypto) validMAC(iv, cipherText, mac []byte) bool {
 	expectedMAC := c.generateMAC(iv, cipherText)
 	return hmac.Equal(mac, expectedMAC)
 }
 
-func (c *crypto) Decrypt(cipherText string) (string, error) {
+func (c *Crypto) Decrypt(cipherText string) (string, error) {
 	cipherByte, err := base64.StdEncoding.DecodeString(cipherText)
 	if err != nil {
 		return "", errors.Wrap(err, "base64.StdEncoding.DecodeString err")
@@ -71,7 +71,7 @@ func (c *crypto) Decrypt(cipherText string) (string, error) {
 	iv := cipherByte[0:aes.BlockSize]
 	mac := cipherByte[aes.BlockSize : aes.BlockSize+c.macSize]
 	cipherByte = cipherByte[aes.BlockSize+c.macSize:]
-	if !c.validMac(iv, cipherByte, mac) {
+	if !c.validMAC(iv, cipherByte, mac) {
 		return "", errors.Wrap(err, "invalid cipherText")
 	}
 
@@ -85,7 +85,7 @@ func NewCryptographer(key string) (Cryptographer, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "aes.NewCipher err")
 	}
-	return &crypto{
+	return &Crypto{
 		key:     key,
 		macHash: sha512.New,
 		macSize: sha512.Size,
