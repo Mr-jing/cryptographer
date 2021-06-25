@@ -72,18 +72,20 @@ func (c *Crypto) Decrypt(cipherText string) (string, error) {
 		return "", errors.Wrap(err, "base64.StdEncoding.DecodeString err")
 	}
 	if len(cipherByte) < aes.BlockSize+c.macSize {
-		return "", errors.Wrap(err, "cipherText too short")
+		return "", errors.New("cipherText too short")
 	}
+
 	iv := cipherByte[0:aes.BlockSize]
 	mac := cipherByte[aes.BlockSize : aes.BlockSize+c.macSize]
-	cipherByte = cipherByte[aes.BlockSize+c.macSize:]
-	if !c.validMAC(iv, cipherByte, mac) {
+	realCipherText := cipherByte[aes.BlockSize+c.macSize:]
+
+	if !c.validMAC(iv, realCipherText, mac) {
 		return "", errors.Wrap(err, "invalid cipherText")
 	}
 
 	stream := cipher.NewCFBDecrypter(c.block, iv)
-	stream.XORKeyStream(cipherByte, cipherByte)
-	return string(cipherByte), nil
+	stream.XORKeyStream(realCipherText, realCipherText)
+	return string(realCipherText), nil
 }
 
 func NewCryptographer(key string) (Cryptographer, error) {
